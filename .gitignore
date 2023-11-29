@@ -1,0 +1,6 @@
+# Don't commit inputs to git
+inputs
+!inputs/.gitignore
+
+# Secrets
+session.txt
