@@ -8,6 +8,9 @@ File.cd(Path.dirname(__ENV__.file))
 ## Parse input
 
 ```elixir
-input = File.read!("inputs/${PADDED_DAY_NO}.txt")
+input =
+  File.read!("inputs/${PADDED_DAY_NO}.txt")
+  |> String.trim_trailing()
+
 input
 ```

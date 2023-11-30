@@ -10,4 +10,4 @@ if test -f "$NOTEBOOK_NAME"; then
 fi
 
 envsubst < DayXX.livemd > $NOTEBOOK_NAME
-curl https://adventofcode.com/2023/day/${1}/input --cookie `cat session.txt` -o inputs/input${PADDED_DAY_NO}.txt
+./downloadInput.sh $1
