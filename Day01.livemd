@@ -82,38 +82,35 @@ defmodule Trebuchet2 do
     next_match =
       Regex.run(~r/[0-9]|one|two|three|four|five|six|seven|eight|nine|zero/, line, return: :index)
 
-    if next_match == nil do
-      []
-    else
-      [{match_start, match_length}] = next_match
+    case next_match do
+      nil ->
+        []
 
-      value =
-        line
-        |> String.slice(match_start, match_length)
-        |> parse_string_value()
+      [{match_start, match_length}] ->
+        value =
+          line
+          |> String.slice(match_start, match_length)
+          |> parse_string_value()
 
-      {_start, remaining_line} = line |> String.split_at(match_start + 1)
+        {_start, remaining_line} = line |> String.split_at(match_start + 1)
 
-      [value | get_numbers(remaining_line)]
+        [value | get_numbers(remaining_line)]
     end
   end
 
   def parse_string_value(value) do
-    if String.length(value) == 1 do
-      String.to_integer(value)
-    else
-      case value do
-        "zero" -> 0
-        "one" -> 1
-        "two" -> 2
-        "three" -> 3
-        "four" -> 4
-        "five" -> 5
-        "six" -> 6
-        "seven" -> 7
-        "eight" -> 8
-        "nine" -> 9
-      end
+    case value do
+      "zero" -> 0
+      "one" -> 1
+      "two" -> 2
+      "three" -> 3
+      "four" -> 4
+      "five" -> 5
+      "six" -> 6
+      "seven" -> 7
+      "eight" -> 8
+      "nine" -> 9
+      numeral -> String.to_integer(numeral)
     end
   end
 
