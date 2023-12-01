@@ -1,0 +1,133 @@
+# Day 01
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/01.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+## Part 1
+
+```elixir
+test_input1 = [
+  "1abc2",
+  "pqr3stu8vwx",
+  "a1b2c3d4e5f",
+  "treb7uchet"
+]
+```
+
+```elixir
+defmodule Trebuchet1 do
+  def solve(input) do
+    input
+    |> Stream.map(&get_line_values/1)
+    |> Enum.sum()
+  end
+
+  def get_numbers(line) do
+    line
+    |> String.codepoints()
+    |> Enum.filter(&String.match?(&1, ~r/[0-9]/))
+  end
+
+  def get_line_values(line) do
+    numbers = get_numbers(line)
+    [first | _tail] = numbers
+    [last | _tail] = Enum.reverse(numbers)
+    String.to_integer(first <> last)
+  end
+end
+
+142 = Trebuchet1.solve(test_input1)
+```
+
+```elixir
+Trebuchet1.solve(input)
+```
+
+## Part 2
+
+```elixir
+test_input2 = [
+  "two1nine",
+  "eightwothree",
+  "abcone2threexyz",
+  "xtwone3four",
+  "4nineeightseven2",
+  "zoneight234",
+  "7pqrstsixteen"
+]
+```
+
+```elixir
+defmodule Trebuchet2 do
+  def solve(input) do
+    input
+    |> Stream.map(&get_line_values/1)
+    |> Enum.sum()
+  end
+
+  def get_numbers(line) do
+    next_match =
+      Regex.run(~r/[0-9]|one|two|three|four|five|six|seven|eight|nine|zero/, line, return: :index)
+
+    if next_match == nil do
+      []
+    else
+      [{match_start, match_length}] = next_match
+
+      value =
+        line
+        |> String.slice(match_start, match_length)
+        |> parse_string_value()
+
+      {_start, remaining_line} = line |> String.split_at(match_start + 1)
+
+      [value | get_numbers(remaining_line)]
+    end
+  end
+
+  def parse_string_value(value) do
+    if String.length(value) == 1 do
+      String.to_integer(value)
+    else
+      case value do
+        "zero" -> 0
+        "one" -> 1
+        "two" -> 2
+        "three" -> 3
+        "four" -> 4
+        "five" -> 5
+        "six" -> 6
+        "seven" -> 7
+        "eight" -> 8
+        "nine" -> 9
+      end
+    end
+  end
+
+  def get_line_values(line) do
+    numbers = get_numbers(line)
+    [first | _tail] = numbers
+    [last | _tail] = Enum.reverse(numbers)
+    10 * first + last
+  end
+end
+
+281 = Trebuchet2.solve(test_input2)
+```
+
+```elixir
+Trebuchet2.solve(input)
+```
