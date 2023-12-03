@@ -1,0 +1,181 @@
+# Day 03
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/03.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  "467..114..",
+  "...*......",
+  "..35..633.",
+  "......#...",
+  "617*......",
+  ".....+.58.",
+  "..592.....",
+  "......755.",
+  "...$.*....",
+  ".664.598.."
+]
+```
+
+## Part 1
+
+```elixir
+defmodule EngineSchematic do
+  @part_regex ~r/[^0-9|.]/
+
+  def get_part_numbers_in_line(line, y) do
+    number_indices =
+      Regex.scan(~r/[0-9]+/, line, return: :index)
+
+    number_indices
+    |> Enum.map(fn [{start, length}] ->
+      {{{start, y}, length}, line |> String.slice(start, length) |> String.to_integer()}
+    end)
+  end
+
+  def get_numbers(input) do
+    input
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {l, y} -> get_part_numbers_in_line(l, y) end)
+  end
+
+  def is_part_number?(part, input) do
+    part_above?(part, input) or
+      part_below?(part, input) or
+      part_left?(part, input) or
+      part_right?(part, input)
+  end
+
+  def part_above?({{{_x, 0}, _l}, _num}, _input), do: false
+
+  def part_above?({{{x, y}, l}, _num}, input) do
+    input
+    |> Enum.at(y - 1)
+    |> String.slice(max(x - 1, 0), l + 2)
+    |> String.match?(@part_regex)
+  end
+
+  def part_below?({{{x, y}, l}, _num}, input) do
+    if y == Enum.count(input) - 1 do
+      false
+    else
+      input
+      |> Enum.at(y + 1)
+      |> String.slice(max(x - 1, 0), l + 2)
+      |> String.match?(@part_regex)
+    end
+  end
+
+  def part_left?({{{0, _y}, _l}, _num}, _input), do: false
+
+  def part_left?({{{x, y}, _l}, _num}, input) do
+    input
+    |> Enum.at(y)
+    |> String.at(x - 1)
+    |> String.match?(@part_regex)
+  end
+
+  def part_right?({{{x, y}, l}, _num}, input) do
+    line = Enum.at(input, y)
+
+    if x + l == String.length(line) do
+      false
+    else
+      line
+      |> String.at(x + l)
+      |> String.match?(@part_regex)
+    end
+  end
+
+  def solve(input) do
+    input
+    |> get_numbers()
+    |> Enum.filter(&is_part_number?(&1, input))
+    |> Enum.map(fn {_, num} -> num end)
+    |> Enum.sum()
+  end
+end
+
+EngineSchematic.solve(test_input)
+```
+
+```elixir
+EngineSchematic.solve(input)
+```
+
+## Part 2
+
+Would have been much easier if my part 1 solution looked for parts first rather than numbers first...
+
+```elixir
+defmodule GearRatios do
+  def get_possible_gear_positions_in_line(line, y) do
+    Regex.scan(~r/\*/, line, return: :index)
+    |> Enum.map(fn [{x, _l}] -> {x, y} end)
+  end
+
+  def get_possible_gear_positions(input) do
+    input
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {l, y} -> get_possible_gear_positions_in_line(l, y) end)
+  end
+
+  def solve(input) do
+    part_numbers = EngineSchematic.get_numbers(input)
+
+    input
+    |> get_possible_gear_positions()
+    |> Enum.map(&get_surrounding_numbers(&1, part_numbers))
+    |> Enum.map(&get_gear_ratio/1)
+    |> Enum.sum()
+  end
+
+  def get_surrounding_numbers(gear_position, part_numbers) do
+    part_numbers
+    |> Enum.filter(&surrounding?(&1, gear_position))
+  end
+
+  def surrounding?(part_number, gear_position) do
+    to_right?(part_number, gear_position) or
+      to_left?(part_number, gear_position) or
+      above_or_below?(part_number, gear_position)
+  end
+
+  def to_right?({{{x, y}, _l}, _num}, {gear_x, y}) when gear_x + 1 == x, do: true
+  def to_right?(_, _), do: false
+
+  def to_left?({{{x, y}, l}, _num}, {gear_x, y}) when gear_x == x + l, do: true
+  def to_left?(_, _), do: false
+
+  def above_or_below?({{{_, y}, _}, _num}, {_, gear_y}) when gear_y > y + 1 or gear_y < y - 1,
+    do: false
+
+  def above_or_below?({{{x, _}, l}, _num}, {gear_x, _}) do
+    x <= gear_x + 1 and x + l >= gear_x
+  end
+
+  def get_gear_ratio([{_p, g1}, {_, g2}]), do: g1 * g2
+
+  def get_gear_ratio(_), do: 0
+end
+
+test_input |> GearRatios.solve()
+```
+
+```elixir
+input |> GearRatios.solve()
+```
