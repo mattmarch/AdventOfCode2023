@@ -55,15 +55,15 @@ defmodule ScratchCard do
 
   def parse_value_list(value_section) do
     value_section
-    |> String.split(" ", trim: true)
-    |> Enum.map(&String.trim/1)
+    |> String.split()
     |> Enum.map(&String.to_integer/1)
     |> MapSet.new()
   end
 
   def score(scratch_card) do
     overlapping_numbers =
-      MapSet.intersection(scratch_card.winning_numbers, scratch_card.chosen_numbers)
+      scratch_card.chosen_numbers
+      |> MapSet.intersection(scratch_card.winning_numbers)
       |> MapSet.size()
 
     if overlapping_numbers == 0 do
@@ -97,23 +97,21 @@ defmodule ScratchCard2 do
       input
       |> Enum.map(&ScratchCard.parse_line/1)
 
-    winnings_per_card =
-      cards
-      |> Enum.map(fn card -> {card.card_number, cards_won(card)} end)
-
     initial_card_counts =
       cards
       |> Enum.map(fn card -> {card.card_number, 1} end)
       |> Map.new()
 
-    winnings_per_card
+    cards
+    |> Enum.map(fn card -> {card.card_number, cards_won(card)} end)
     |> Enum.reduce(initial_card_counts, &update_card_counts/2)
     |> Map.values()
     |> Enum.sum()
   end
 
   def cards_won(scratch_card) do
-    MapSet.intersection(scratch_card.winning_numbers, scratch_card.chosen_numbers)
+    scratch_card.chosen_numbers
+    |> MapSet.intersection(scratch_card.winning_numbers)
     |> MapSet.size()
   end
 
@@ -121,9 +119,8 @@ defmodule ScratchCard2 do
 
   def update_card_counts({card_number, winnings}, card_counts) do
     count_of_card = card_counts |> Map.get(card_number)
-    cards_won = (card_number + 1)..(card_number + winnings)
 
-    cards_won
+    (card_number + 1)..(card_number + winnings)
     |> Enum.reduce(card_counts, &increase_count_at(&1, &2, count_of_card))
   end
 
