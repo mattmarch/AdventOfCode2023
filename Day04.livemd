@@ -1,0 +1,140 @@
+# Day 04
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/04.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  "Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53",
+  "Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19",
+  "Card 3:  1 21 53 59 44 | 69 82 63 72 16 21 14  1",
+  "Card 4: 41 92 73 84 69 | 59 84 76 51 58  5 54 83",
+  "Card 5: 87 83 26 28 32 | 88 30 70 12 93 22 82 36",
+  "Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11"
+]
+```
+
+## Part 1
+
+```elixir
+defmodule ScratchCard do
+  defstruct [:card_number, :chosen_numbers, :winning_numbers]
+
+  def parse_line("Card " <> line) do
+    [card_num_str, values] = line |> String.split(": ")
+
+    card_number =
+      card_num_str
+      |> String.trim()
+      |> String.to_integer()
+
+    [winning_numbers, chosen_numbers] =
+      values
+      |> String.split(" | ")
+      |> Enum.map(&parse_value_list/1)
+
+    %ScratchCard{
+      card_number: card_number,
+      winning_numbers: winning_numbers,
+      chosen_numbers: chosen_numbers
+    }
+  end
+
+  def parse_value_list(value_section) do
+    value_section
+    |> String.split(" ", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.map(&String.to_integer/1)
+    |> MapSet.new()
+  end
+
+  def score(scratch_card) do
+    overlapping_numbers =
+      MapSet.intersection(scratch_card.winning_numbers, scratch_card.chosen_numbers)
+      |> MapSet.size()
+
+    if overlapping_numbers == 0 do
+      0
+    else
+      2 ** (overlapping_numbers - 1)
+    end
+  end
+
+  def solve(input) do
+    input
+    |> Stream.map(&parse_line/1)
+    |> Stream.map(&score/1)
+    |> Enum.sum()
+  end
+end
+
+test_input |> ScratchCard.solve()
+```
+
+```elixir
+input |> ScratchCard.solve()
+```
+
+## Part 2
+
+```elixir
+defmodule ScratchCard2 do
+  def solve(input) do
+    cards =
+      input
+      |> Enum.map(&ScratchCard.parse_line/1)
+
+    winnings_per_card =
+      cards
+      |> Enum.map(fn card -> {card.card_number, cards_won(card)} end)
+
+    initial_card_counts =
+      cards
+      |> Enum.map(fn card -> {card.card_number, 1} end)
+      |> Map.new()
+
+    winnings_per_card
+    |> Enum.reduce(initial_card_counts, &update_card_counts/2)
+    |> Map.values()
+    |> Enum.sum()
+  end
+
+  def cards_won(scratch_card) do
+    MapSet.intersection(scratch_card.winning_numbers, scratch_card.chosen_numbers)
+    |> MapSet.size()
+  end
+
+  def update_card_counts({_card_number, 0}, card_counts), do: card_counts
+
+  def update_card_counts({card_number, winnings}, card_counts) do
+    count_of_card = card_counts |> Map.get(card_number)
+    cards_won = (card_number + 1)..(card_number + winnings)
+
+    cards_won
+    |> Enum.reduce(card_counts, &increase_count_at(&1, &2, count_of_card))
+  end
+
+  def increase_count_at(n, counts, increment) do
+    counts |> Map.update!(n, fn c -> c + increment end)
+  end
+end
+
+test_input |> ScratchCard2.solve()
+```
+
+```elixir
+input |> ScratchCard2.solve()
+```
