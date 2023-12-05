@@ -1,0 +1,219 @@
+# Day 05
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/05.txt")
+  |> String.trim_trailing()
+  |> String.split("\n\n")
+
+input
+```
+
+## Test input
+
+```elixir
+test_input =
+  [
+    "seeds: 79 14 55 13",
+    """
+    seed-to-soil map:
+    50 98 2
+    52 50 48
+    """,
+    """
+    soil-to-fertilizer map:
+    0 15 37
+    37 52 2
+    39 0 15
+    """,
+    """
+    fertilizer-to-water map:
+    49 53 8
+    0 11 42
+    42 0 7
+    57 7 4
+    """,
+    """
+    water-to-light map:
+    88 18 7
+    18 25 70
+    """,
+    """
+    light-to-temperature map:
+    45 77 23
+    81 45 19
+    68 64 13
+    """,
+    """
+    temperature-to-humidity map:
+    0 69 1
+    1 0 69
+    """,
+    """
+    humidity-to-location map:
+    60 56 37
+    56 93 4
+    """
+  ]
+  |> Enum.map(&String.trim/1)
+```
+
+## Part 1
+
+```elixir
+defmodule RangeMapping do
+  defstruct [:destination, :source, :range]
+end
+```
+
+```elixir
+defmodule Parse do
+  def parse(input) do
+    [seeds | mappings] = input
+    {parse_seeds(seeds), mappings |> Enum.map(&parse_mapping/1)}
+  end
+
+  def parse_seeds(seeds_section) do
+    ["seeds:" | values] = seeds_section |> String.split()
+
+    values
+    |> Enum.map(&String.to_integer/1)
+  end
+
+  def parse_mapping(mapping_section) do
+    [_name | mappings] = mapping_section |> String.split("\n")
+
+    mappings
+    |> Enum.map(&parse_mapping_line/1)
+  end
+
+  def parse_mapping_line(mapping_line) do
+    [destination, source, range] =
+      mapping_line
+      |> String.split()
+      |> Enum.map(&String.to_integer/1)
+
+    %RangeMapping{destination: destination, source: source, range: range}
+  end
+end
+
+{test_seeds, test_mappings} = Parse.parse(test_input)
+```
+
+```elixir
+defmodule Part1 do
+  def solve({seeds, mappings}) do
+    seeds
+    |> Enum.map(&seed_to_location(&1, mappings))
+    |> Enum.min()
+  end
+
+  def seed_to_location(seed_number, mappings) do
+    mappings
+    |> Enum.reduce(seed_number, &map_source/2)
+  end
+
+  def map_source(mappings, target_source) do
+    mappings
+    |> Enum.find_value(target_source, &try_map_source(target_source, &1))
+  end
+
+  def try_map_source(target_source, %RangeMapping{
+        destination: destination,
+        source: source,
+        range: range
+      }) do
+    case target_source - source do
+      offset when offset < 0 -> nil
+      offset when offset >= range -> nil
+      offset -> destination + offset
+    end
+  end
+end
+
+test_input |> Parse.parse() |> Part1.solve()
+```
+
+```elixir
+input |> Parse.parse() |> Part1.solve()
+```
+
+## Part 2
+
+Total seeds to consider if we have to try each of them:
+
+```elixir
+input |> Parse.parse() |> elem(0) |> Enum.drop(1) |> Enum.take_every(2) |> Enum.sum()
+```
+
+Quite a lot to check...
+
+Instead let's start at location 0 and test all sequentially until we find one which matches a seed.
+
+```elixir
+defmodule Part2 do
+  def get_seed_ranges(seeds) do
+    seeds
+    |> Enum.chunk_every(2)
+    |> Enum.map(fn [start, range] -> {start, start + range - 1} end)
+  end
+
+  def in_range?({range_start, range_end}, number) do
+    number >= range_start and number <= range_end
+  end
+
+  def owned_seed?(number, seed_ranges) do
+    seed_ranges
+    |> Enum.any?(&in_range?(&1, number))
+  end
+
+  def location_corresponds_to_owned_seed?(location, mappings, seed_ranges) do
+    owned_seed?(location_to_seed(location, mappings), seed_ranges)
+  end
+
+  def solve({seeds, mappings}) do
+    reversed_mappings = Enum.reverse(mappings)
+    seed_ranges = get_seed_ranges(seeds)
+
+    Stream.iterate(0, fn n -> n + 1 end)
+    |> Stream.filter(&location_corresponds_to_owned_seed?(&1, reversed_mappings, seed_ranges))
+    |> Enum.take(1)
+    |> hd()
+  end
+
+  def location_to_seed(seed_number, mappings) do
+    mappings
+    |> Enum.reduce(seed_number, &map_destination/2)
+  end
+
+  def map_destination(mappings, target_destination) do
+    mappings
+    |> Enum.find_value(target_destination, &try_map_destination(target_destination, &1))
+  end
+
+  def try_map_destination(target_destination, %RangeMapping{
+        destination: destination,
+        source: source,
+        range: range
+      }) do
+    case target_destination - destination do
+      offset when offset < 0 -> nil
+      offset when offset >= range -> nil
+      offset -> source + offset
+    end
+  end
+end
+
+test_input |> Parse.parse() |> Part2.solve()
+```
+
+```elixir
+input |> Parse.parse() |> Part2.solve()
+```
