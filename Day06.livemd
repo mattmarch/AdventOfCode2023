@@ -1,0 +1,109 @@
+# Day 06
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/06.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  "Time:      7  15   30",
+  "Distance:  9  40  200"
+]
+```
+
+## Part 1
+
+```elixir
+defmodule Parse do
+  def parse(input) do
+    [times, distances] =
+      input
+      |> Enum.map(&parse_line/1)
+
+    Enum.zip(times, distances)
+  end
+
+  def parse_line(line) do
+    line
+    |> String.split()
+    |> tl()
+    |> Enum.map(&String.to_integer/1)
+  end
+end
+
+test_races = test_input |> Parse.parse()
+```
+
+```elixir
+defmodule BoatRace do
+  def solve(races) do
+    races
+    |> Enum.map(&winning_hold_times/1)
+    |> Enum.map(&Enum.count/1)
+    |> Enum.product()
+  end
+
+  def winning_hold_times(race_info) do
+    Stream.iterate(1, &(&1 + 1))
+    |> Stream.drop_while(&(not wins_race?(&1, race_info)))
+    |> Stream.take_while(&wins_race?(&1, race_info))
+    |> Enum.to_list()
+  end
+
+  def wins_race?(hold_time, {time, distance}) do
+    hold_time * (time - hold_time) > distance
+  end
+end
+
+BoatRace.solve(test_races)
+```
+
+```elixir
+input |> Parse.parse() |> BoatRace.solve()
+```
+
+## Part 2
+
+```elixir
+defmodule Parse2 do
+  def parse(input) do
+    [time, distance] =
+      input
+      |> Enum.map(&parse_line/1)
+
+    [{time, distance}]
+  end
+
+  def parse_line(line) do
+    line
+    |> String.replace(" ", "")
+    |> String.split(":")
+    |> Enum.at(1)
+    |> String.to_integer()
+  end
+end
+
+test_races2 = test_input |> Parse2.parse()
+```
+
+```elixir
+test_races2 |> BoatRace.solve()
+```
+
+Could do something smarter here but finishes on real input in under 10s.
+
+```elixir
+input |> Parse2.parse() |> BoatRace.solve()
+```
