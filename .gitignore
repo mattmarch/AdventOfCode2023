@@ -1,6 +1,6 @@
 # Don't commit inputs to git
-inputs
-!inputs/.gitignore
+inputs/*
+!inputs/.gitkeep
 
 # Secrets
 session.txt
