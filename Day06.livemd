@@ -74,7 +74,7 @@ BoatRace.solve(test_races)
 input |> Parse.parse() |> BoatRace.solve()
 ```
 
-## Part 2
+## Part 2 parsing
 
 ```elixir
 defmodule Parse2 do
@@ -83,7 +83,7 @@ defmodule Parse2 do
       input
       |> Enum.map(&parse_line/1)
 
-    [{time, distance}]
+    {time, distance}
   end
 
   def parse_line(line) do
@@ -98,12 +98,52 @@ end
 test_races2 = test_input |> Parse2.parse()
 ```
 
+## Part 2 naive solve
+
 ```elixir
-test_races2 |> BoatRace.solve()
+test_races2 |> List.wrap() |> BoatRace.solve()
 ```
 
 Could do something smarter here but finishes on real input in under 10s.
 
 ```elixir
-input |> Parse2.parse() |> BoatRace.solve()
+input |> Parse2.parse() |> List.wrap() |> BoatRace.solve()
+```
+
+<!-- livebook:{"branch_parent_index":2} -->
+
+## Part 2 done properly
+
+Need points where `hold_time * (time - hold_time) > distance`.
+
+So look at number of points between intersections of `hold_time^2 - time*hold_time + distance = 0`.
+
+Quadratic formula gives us:
+
+```
+hold_time = (time ± sqrt(time*2 - 4 * distance)) / 2
+```
+
+```elixir
+defmodule BoatRace2 do
+  def solve(race_info) do
+    {min_hold, max_hold} = get_crossing_points(race_info)
+    1 + trunc(Float.floor(max_hold) - Float.ceil(min_hold))
+  end
+
+  def get_crossing_points({time, distance}) do
+    sqrt_discriminant = (time ** 2 - 4 * distance) ** 0.5
+
+    {
+      (time - sqrt_discriminant) / 2,
+      (time + sqrt_discriminant) / 2
+    }
+  end
+end
+
+test_races2 |> BoatRace2.solve()
+```
+
+```elixir
+input |> Parse2.parse() |> BoatRace2.solve()
 ```
