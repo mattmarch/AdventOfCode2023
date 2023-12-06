@@ -121,7 +121,7 @@ So look at number of points between intersections of `hold_time^2 - time*hold_ti
 Quadratic formula gives us:
 
 ```
-hold_time = (time ± sqrt(time*2 - 4 * distance)) / 2
+hold_time = (time ± sqrt(time^2 - 4 * distance)) / 2
 ```
 
 ```elixir
