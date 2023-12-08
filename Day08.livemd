@@ -1,0 +1,172 @@
+# Day 08
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/08.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input1 = [
+  "RL",
+  "",
+  "AAA = (BBB, CCC)",
+  "BBB = (DDD, EEE)",
+  "CCC = (ZZZ, GGG)",
+  "DDD = (DDD, DDD)",
+  "EEE = (EEE, EEE)",
+  "GGG = (GGG, GGG)",
+  "ZZZ = (ZZZ, ZZZ)"
+]
+
+test_input2 = [
+  "LLR",
+  "",
+  "AAA = (BBB, BBB)",
+  "BBB = (AAA, ZZZ)",
+  "ZZZ = (ZZZ, ZZZ)"
+]
+```
+
+## Part 1
+
+```elixir
+defmodule MapNode do
+  defstruct [:left, :right]
+
+  def parse_line(line) do
+    [node_name, left, right] =
+      line
+      |> String.split([" = (", ", ", ")"], trim: true)
+
+    {node_name, %MapNode{left: left, right: right}}
+  end
+end
+
+test_input1 |> Enum.at(3) |> MapNode.parse_line()
+```
+
+```elixir
+defmodule Part1 do
+  def parse([directions, "" | nodes]) do
+    node_map =
+      nodes
+      |> Enum.map(&MapNode.parse_line/1)
+      |> Map.new()
+
+    {String.graphemes(directions), node_map}
+  end
+
+  def get_next_node(next_step, current_node, nodes) do
+    %MapNode{left: left, right: right} = nodes |> Map.get(current_node)
+
+    case next_step do
+      "R" -> right
+      "L" -> left
+    end
+  end
+
+  def solve(input) do
+    {directions, nodes} = parse(input)
+
+    Stream.cycle(directions)
+    |> Stream.scan("AAA", &get_next_node(&1, &2, nodes))
+    |> Stream.with_index(1)
+    |> Stream.filter(fn {node, _} -> node == "ZZZ" end)
+    |> Enum.take(1)
+    |> List.first()
+    |> elem(1)
+  end
+end
+
+test_input2 |> Part1.solve()
+```
+
+```elixir
+input |> Part1.solve()
+```
+
+## Part 2
+
+```elixir
+test_input3 = [
+  "LR",
+  "",
+  "11A = (11B, XXX)",
+  "11B = (XXX, 11Z)",
+  "11Z = (11B, XXX)",
+  "22A = (22B, XXX)",
+  "22B = (22C, 22C)",
+  "22C = (22Z, 22Z)",
+  "22Z = (22B, 22B)",
+  "XXX = (XXX, XXX)"
+]
+```
+
+```elixir
+defmodule CycleCheck do
+  def end_node?(node), do: String.ends_with?(node, "Z")
+
+  def get_start_nodes(node_map) do
+    node_map
+    |> Map.keys()
+    |> Enum.filter(&String.ends_with?(&1, "A"))
+  end
+
+  def get_cycle_start_and_size(directions, nodes, start_node) do
+    [{_, cycle_start}, {_, cycle_end}] =
+      Stream.cycle(directions)
+      |> Stream.scan(start_node, &Part1.get_next_node(&1, &2, nodes))
+      |> Stream.with_index(1)
+      |> Stream.filter(fn {node, _} -> String.ends_with?(node, "Z") end)
+      |> Enum.take(2)
+
+    {cycle_start, cycle_end - cycle_start}
+  end
+
+  def get_all_cycle_starts_and_sizes({directions, nodes}) do
+    nodes
+    |> get_start_nodes()
+    |> Enum.map(&get_cycle_start_and_size(directions, nodes, &1))
+  end
+end
+
+input |> Part1.parse() |> CycleCheck.get_all_cycle_starts_and_sizes()
+```
+
+Looks like we can make some assumptions here... 🤔
+
+```elixir
+defmodule Part2 do
+  def solve(input) do
+    {directions, nodes} = Part1.parse(input)
+
+    nodes
+    |> CycleCheck.get_start_nodes()
+    |> Enum.map(&CycleCheck.get_cycle_start_and_size(directions, nodes, &1))
+    |> Enum.map(&elem(&1, 1))
+    |> lcm()
+  end
+
+  def lcm(values), do: Enum.reduce(values, &lcm/2)
+  def lcm(a, b), do: div(a * b, gcd(a, b))
+  def gcd(a, 0), do: a
+  def gcd(a, b), do: gcd(b, rem(a, b))
+end
+
+test_input3 |> Part2.solve()
+```
+
+```elixir
+input |> Part2.solve()
+```
