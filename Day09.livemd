@@ -34,14 +34,11 @@ defmodule Part1 do
     |> Enum.map(&String.to_integer/1)
   end
 
-  def get_differences(seq) do
-    seq
-    |> Enum.chunk_every(2, 1, :discard)
-    |> Enum.map(fn [a, b] -> b - a end)
-  end
-
   def predict_next_value(seq) do
-    differences = get_differences(seq)
+    differences =
+      seq
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.map(fn [a, b] -> b - a end)
 
     if differences |> Enum.all?(&(&1 == 0)) do
       hd(seq)
@@ -69,20 +66,11 @@ input |> Part1.solve()
 
 ```elixir
 defmodule Part2 do
-  def predict_previous_value(seq) do
-    differences = Part1.get_differences(seq)
-
-    if differences |> Enum.all?(&(&1 == 0)) do
-      hd(seq)
-    else
-      hd(seq) - predict_previous_value(differences)
-    end
-  end
-
   def solve(input) do
     input
     |> Stream.map(&Part1.parse_line/1)
-    |> Stream.map(&predict_previous_value/1)
+    |> Stream.map(&Enum.reverse/1)
+    |> Stream.map(&Part1.predict_next_value/1)
     |> Enum.sum()
   end
 end
