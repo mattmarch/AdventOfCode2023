@@ -1,0 +1,144 @@
+# Day 10
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/10.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  "7-F7-",
+  ".FJ|7",
+  "SJLL7",
+  "|F--J",
+  "LJ.LJ"
+]
+```
+
+## Part 1
+
+```elixir
+defmodule PipeMaze do
+  def parse(input) do
+    positions =
+      input
+      |> Enum.with_index()
+      |> Enum.flat_map(&parse_line/1)
+
+    starting_position =
+      positions
+      |> Enum.find(fn {_pos, p} -> p == "S" end)
+      |> elem(0)
+
+    {starting_position, Map.new(positions)}
+  end
+
+  def parse_line({line, y}) do
+    line
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {pipe, x} -> {{x, y}, pipe} end)
+  end
+
+  def get_next_pipe({{x, y}, from_direction}, pipe) do
+    case {pipe, from_direction} do
+      {"-", :west} -> {{x + 1, y}, :west}
+      {"-", :east} -> {{x - 1, y}, :east}
+      {"|", :south} -> {{x, y - 1}, :south}
+      {"|", :north} -> {{x, y + 1}, :north}
+      {"7", :south} -> {{x - 1, y}, :east}
+      {"7", :west} -> {{x, y + 1}, :north}
+      {"J", :west} -> {{x, y - 1}, :south}
+      {"J", :north} -> {{x - 1, y}, :east}
+      {"L", :north} -> {{x + 1, y}, :west}
+      {"L", :east} -> {{x, y - 1}, :south}
+      {"F", :east} -> {{x, y + 1}, :north}
+      {"F", :south} -> {{x + 1, y}, :west}
+      _ -> nil
+    end
+  end
+
+  def get_pipes_from_start({x, y}, pipes) do
+    [
+      {{x + 1, y}, :west},
+      {{x, y + 1}, :north},
+      {{x - 1, y}, :east},
+      {{x, y - 1}, :south}
+    ]
+    |> Enum.reject(fn {pos, dir} ->
+      is_nil(get_next_pipe({pos, dir}, Map.get(pipes, pos)))
+    end)
+  end
+
+  def traverse_pipes(pipes, steps_taken) do
+    [{pos, dir} | _] = steps_taken
+
+    case Map.get(pipes, pos) do
+      "S" ->
+        steps_taken
+
+      pipe ->
+        next_step = get_next_pipe({pos, dir}, pipe)
+        traverse_pipes(pipes, [next_step | steps_taken])
+    end
+  end
+
+  def solve(input) do
+    {start, pipes} = parse(input)
+    first_step = get_pipes_from_start(start, pipes) |> hd()
+
+    steps_taken =
+      traverse_pipes(pipes, [first_step])
+      |> Enum.count()
+
+    div(steps_taken, 2)
+  end
+end
+
+test_input |> PipeMaze.solve()
+```
+
+```elixir
+input |> PipeMaze.solve()
+```
+
+## Part 2
+
+```elixir
+test_input2 = [
+  "FF7FSF7F7F7F7F7F---7",
+  "L|LJ||||||||||||F--J",
+  "FL-7LJLJ||||||LJL-77",
+  "F--JF--7||LJLJ7F7FJ-",
+  "L---JF-JLJ.||-FJLJJ7",
+  "|F|F-JF---7F7-L7L|7|",
+  "|FFJF7L7F-JF7|JL---7",
+  "7-L-JL7||F7|L7F-7F7|",
+  "L.L7LFJ|||||FJL7||LJ",
+  "L7JLJL-JLJLJL--JLJ.L"
+]
+```
+
+```elixir
+defmodule PipeMaze2 do
+  def solve(input) do
+    {start, pipes} = PipeMaze.parse(input)
+    first_step = PipeMaze.get_pipes_from_start(start, pipes) |> hd()
+
+    PipeMaze.traverse_pipes(pipes, [first_step])
+  end
+end
+
+test_input2 |> PipeMaze2.solve()
+```
