@@ -1,0 +1,93 @@
+# Day 11
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/11.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  "...#......",
+  ".......#..",
+  "#.........",
+  "..........",
+  "......#...",
+  ".#........",
+  ".........#",
+  "..........",
+  ".......#..",
+  "#...#....."
+]
+```
+
+## Part 1
+
+```elixir
+defmodule CosmicExpansion do
+  def parse(input) do
+    row_length = input |> hd() |> String.length()
+
+    empty_columns =
+      0..(row_length - 1)
+      |> Enum.filter(fn x -> input |> Enum.all?(fn r -> r |> String.at(x) == "." end) end)
+
+    input
+    |> Enum.flat_map(&parse_line(&1, empty_columns))
+    |> Enum.with_index()
+    |> Enum.flat_map(&add_index/1)
+  end
+
+  def parse_line(line, empty_columns) do
+    expanded_line =
+      empty_columns
+      |> Enum.with_index()
+      |> Enum.reduce(String.graphemes(line), fn {c, i}, line ->
+        List.insert_at(line, c + i, ".")
+      end)
+
+    if expanded_line |> Enum.all?(&(&1 == ".")) do
+      [expanded_line, expanded_line]
+    else
+      [expanded_line]
+    end
+  end
+
+  def add_index({line, y}) do
+    line
+    |> Enum.with_index()
+    |> Enum.map(fn {c, x} -> {{x, y}, c} end)
+  end
+
+  def get_distance({x1, y1}, {x2, y2}), do: abs(x1 - x2) + abs(y1 - y2)
+
+  def solve(input) do
+    galaxy_positions =
+      parse(input)
+      |> Enum.filter(fn {_p, c} -> c == "#" end)
+      |> Enum.map(&elem(&1, 0))
+
+    for g1 <- galaxy_positions, g2 <- galaxy_positions, g1 != g2 do
+      get_distance(g1, g2)
+    end
+    |> Enum.sum()
+    |> div(2)
+  end
+end
+
+test_input |> CosmicExpansion.solve()
+```
+
+```elixir
+input |> CosmicExpansion.solve()
+```
