@@ -117,6 +117,18 @@ input |> PipeMaze.solve()
 
 ```elixir
 test_input2 = [
+  "..........",
+  ".S------7.",
+  ".|F----7|.",
+  ".||OOOO||.",
+  ".||OOOO||.",
+  ".|L-7F-J|.",
+  ".|II||II|.",
+  ".L--JL--J.",
+  ".........."
+]
+
+test_input3 = [
   "FF7FSF7F7F7F7F7F---7",
   "L|LJ||||||||||||F--J",
   "FL-7LJLJ||||||LJL-77",
@@ -136,9 +148,47 @@ defmodule PipeMaze2 do
     {start, pipes} = PipeMaze.parse(input)
     first_step = PipeMaze.get_pipes_from_start(start, pipes) |> hd()
 
-    PipeMaze.traverse_pipes(pipes, [first_step])
+    pipe_loop_excluding_start =
+      PipeMaze.traverse_pipes(pipes, [first_step])
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.map(fn [{_prev_p, from_dir}, {p, to_dir}] -> {p, {from_dir, to_dir}} end)
+
+    {_, {first_dir, _}} = pipe_loop_excluding_start |> hd()
+    {_, {_, final_dir}} = pipe_loop_excluding_start |> List.last()
+
+    pipe_loop =
+      [{start, {final_dir, first_dir}} | pipe_loop_excluding_start]
+      |> Map.new()
+
+    row_length = input |> hd() |> String.length()
+    column_length = input |> Enum.count()
+
+    0..(column_length - 1)
+    |> Enum.map(&count_inside_loop_in_row(pipe_loop, &1, row_length))
+    |> Enum.sum()
+  end
+
+  def count_inside_loop_in_row(pipe_loop, y, row_length) do
+    0..(row_length - 1)
+    |> Enum.reduce({false, 0}, fn x, {inside?, count} ->
+      case {inside?, Map.get(pipe_loop, {x, y})} do
+        {_, {:south, _}} -> {not inside?, count}
+        {_, {_, :north}} -> {not inside?, count}
+        {true, nil} -> {true, count + 1}
+        _ -> {inside?, count}
+      end
+    end)
+    |> elem(1)
   end
 end
 
 test_input2 |> PipeMaze2.solve()
+```
+
+```elixir
+test_input3 |> PipeMaze2.solve()
+```
+
+```elixir
+input |> PipeMaze2.solve()
 ```
