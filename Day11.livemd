@@ -35,47 +35,49 @@ test_input = [
 
 ```elixir
 defmodule CosmicExpansion do
-  def parse(input) do
+  def parse(input, space_width) do
     row_length = input |> hd() |> String.length()
 
     empty_columns =
       0..(row_length - 1)
       |> Enum.filter(fn x -> input |> Enum.all?(fn r -> r |> String.at(x) == "." end) end)
 
+    empty_rows =
+      input
+      |> Enum.with_index()
+      |> Enum.filter(fn {r, _y} -> r |> String.graphemes() |> Enum.all?(&(&1 == ".")) end)
+      |> Enum.map(&elem(&1, 1))
+
     input
-    |> Enum.flat_map(&parse_line(&1, empty_columns))
+    |> Enum.map(&get_galaxy_x_indices(&1, empty_columns, space_width))
     |> Enum.with_index()
+    |> Enum.map(fn {r, y} -> {r, y + count_less_than(empty_rows, y) * (space_width - 1)} end)
     |> Enum.flat_map(&add_index/1)
   end
 
-  def parse_line(line, empty_columns) do
-    expanded_line =
-      empty_columns
-      |> Enum.with_index()
-      |> Enum.reduce(String.graphemes(line), fn {c, i}, line ->
-        List.insert_at(line, c + i, ".")
-      end)
+  def get_galaxy_x_indices(line, empty_columns, space_width) do
+    line
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.filter(fn {c, _x} -> c == "#" end)
+    |> Enum.map(fn {_c, x} -> x + count_less_than(empty_columns, x) * (space_width - 1) end)
+  end
 
-    if expanded_line |> Enum.all?(&(&1 == ".")) do
-      [expanded_line, expanded_line]
-    else
-      [expanded_line]
-    end
+  def count_less_than(list, threshold) do
+    list
+    |> Enum.filter(&(&1 < threshold))
+    |> Enum.count()
   end
 
   def add_index({line, y}) do
     line
-    |> Enum.with_index()
-    |> Enum.map(fn {c, x} -> {{x, y}, c} end)
+    |> Enum.map(fn x -> {x, y} end)
   end
 
   def get_distance({x1, y1}, {x2, y2}), do: abs(x1 - x2) + abs(y1 - y2)
 
-  def solve(input) do
-    galaxy_positions =
-      parse(input)
-      |> Enum.filter(fn {_p, c} -> c == "#" end)
-      |> Enum.map(&elem(&1, 0))
+  def solve(input, space_width) do
+    galaxy_positions = parse(input, space_width)
 
     for g1 <- galaxy_positions, g2 <- galaxy_positions, g1 != g2 do
       get_distance(g1, g2)
@@ -85,9 +87,19 @@ defmodule CosmicExpansion do
   end
 end
 
-test_input |> CosmicExpansion.solve()
+test_input |> CosmicExpansion.solve(2)
 ```
 
 ```elixir
-input |> CosmicExpansion.solve()
+input |> CosmicExpansion.solve(2)
+```
+
+## Part 2
+
+```elixir
+test_input |> CosmicExpansion.solve(100)
+```
+
+```elixir
+input |> CosmicExpansion.solve(1_000_000)
 ```
