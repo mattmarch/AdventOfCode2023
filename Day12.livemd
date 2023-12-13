@@ -4,7 +4,7 @@
 # Change working directory to this file's directory.
 File.cd(Path.dirname(__ENV__.file))
 
-Mix.install([:combinatorics])
+Mix.install([:combinatorics, :memoize])
 ```
 
 ## Parse input
@@ -91,29 +91,97 @@ end
 test_input |> HotSprings.solve()
 ```
 
+## Part 1 with the real input (warning: slow)
+
 ```elixir
 input |> HotSprings.solve()
 ```
+
+<!-- livebook:{"branch_parent_index":1} -->
 
 ## Part 2
 
 ```elixir
 defmodule HotSprings2 do
+  use Memoize
+
   def solve(input) do
     input
     |> Stream.map(&HotSprings.parse_line/1)
-    |> Stream.map(fn {conds, groups} ->
-      HotSprings.get_combinations(repeat(conds, 5), repeat(groups, 5))
-    end)
+    |> Stream.map(fn {conds, groups} -> {repeat_conds(conds, 5), repeat_groups(groups, 5)} end)
+    |> Stream.map(fn {conditions, groups} -> count_possibilities(0, groups, conditions) end)
     |> Enum.sum()
   end
 
-  def repeat(arr, n) do
+  def repeat_groups(arr, n) do
     arr
     |> List.duplicate(n)
     |> List.flatten()
   end
+
+  def repeat_conds(arr, n) do
+    arr
+    |> List.duplicate(n)
+    |> Enum.map(fn l -> ["?" | l] end)
+    |> List.flatten()
+    |> Enum.drop(1)
+  end
+
+  defmemo(count_possibilities(0, [], []), do: 1)
+
+  defmemo(count_possibilities(n, [n], []), do: 1)
+
+  defmemo(count_possibilities(_n, _groups, []), do: 0)
+
+  defmemo(count_possibilities(n, [], _conditions) when n > 0, do: 0)
+
+  defmemo count_possibilities(0, groups, ["." | other_conditions]) do
+    count_possibilities(0, groups, other_conditions)
+  end
+
+  defmemo count_possibilities(0, groups, ["#" | other_conditions]) do
+    count_possibilities(1, groups, other_conditions)
+  end
+
+  defmemo count_possibilities(0, groups, ["?" | other_conditions]) do
+    count_possibilities(1, groups, other_conditions) +
+      count_possibilities(0, groups, other_conditions)
+  end
+
+  defmemo count_possibilities(current_group_length, [next_group | other_groups], [
+            "." | other_conditions
+          ]) do
+    if next_group == current_group_length do
+      count_possibilities(0, other_groups, other_conditions)
+    else
+      0
+    end
+  end
+
+  defmemo count_possibilities(current_group_length, groups, ["#" | other_conditions]) do
+    if hd(groups) > current_group_length do
+      count_possibilities(current_group_length + 1, groups, other_conditions)
+    else
+      0
+    end
+  end
+
+  defmemo count_possibilities(current_group_length, [next_group | other_groups], [
+            "?" | other_conditions
+          ]) do
+    case current_group_length do
+      ^next_group ->
+        count_possibilities(0, other_groups, other_conditions)
+
+      count when count < next_group ->
+        count_possibilities(count + 1, [next_group | other_groups], other_conditions)
+    end
+  end
 end
 
 test_input |> HotSprings2.solve()
+```
+
+```elixir
+input |> HotSprings2.solve()
 ```
