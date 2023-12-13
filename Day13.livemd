@@ -1,0 +1,145 @@
+# Day 13
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/13.txt")
+  |> String.trim_trailing()
+  |> String.split("\n\n")
+  |> Enum.map(&String.split(&1, "\n"))
+
+input
+```
+
+```elixir
+test_input =
+  """
+  #.##..##.
+  ..#.##.#.
+  ##......#
+  ##......#
+  ..#.##.#.
+  ..##..##.
+  #.#.##.#.
+
+  #...##..#
+  #....#..#
+  ..##..###
+  #####.##.
+  #####.##.
+  ..##..###
+  #....#..#
+  """
+  |> String.trim()
+  |> String.split("\n\n")
+  |> Enum.map(&String.split(&1, "\n"))
+```
+
+## Part 1
+
+```elixir
+defmodule Mirrors do
+  def transpose(pattern) do
+    x_size = pattern |> hd |> String.length()
+
+    0..(x_size - 1)
+    |> Enum.map(fn i -> pattern |> Enum.map(&String.at(&1, i)) |> Enum.join() end)
+  end
+
+  def vertical_symmetry_at?(pattern, y) do
+    {before_split, after_split} = pattern |> Enum.split(y)
+    min_length = min(Enum.count(before_split), Enum.count(after_split))
+
+    before_split |> Enum.reverse() |> Enum.take(min_length) ==
+      after_split |> Enum.take(min_length)
+  end
+
+  def get_vertical_symmetry_line(pattern) do
+    1..(Enum.count(pattern) - 1)
+    |> Enum.find(&vertical_symmetry_at?(pattern, &1))
+  end
+
+  def get_horizontal_symmetry_line(pattern) do
+    transposed_pattern = pattern |> transpose()
+    get_vertical_symmetry_line(transposed_pattern)
+  end
+
+  def get_symmetry_score(pattern) do
+    case get_vertical_symmetry_line(pattern) do
+      nil -> get_horizontal_symmetry_line(pattern)
+      val -> 100 * val
+    end
+  end
+
+  def solve(input) do
+    input
+    |> Enum.map(&get_symmetry_score/1)
+    |> Enum.sum()
+  end
+end
+
+test_input |> Mirrors.solve()
+```
+
+```elixir
+input |> Mirrors.solve()
+```
+
+## Part 2
+
+```elixir
+defmodule SmudgedMirrors do
+  def smudged_symmetry_at?(pattern, y) do
+    {before_split, after_split} = pattern |> Enum.split(y)
+
+    differences =
+      before_split
+      |> Enum.reverse()
+      |> Enum.zip(after_split)
+      |> Enum.map(fn {l1, l2} -> differences_between_lines(l1, l2) end)
+      |> Enum.sum()
+
+    differences == 1
+  end
+
+  def differences_between_lines(l1, l2) do
+    Enum.zip(String.graphemes(l1), String.graphemes(l2))
+    |> Enum.count(fn {c1, c2} -> c1 != c2 end)
+  end
+
+  def get_vertical_symmetry_line(pattern) do
+    1..(Enum.count(pattern) - 1)
+    |> Enum.find(&smudged_symmetry_at?(pattern, &1))
+  end
+
+  def get_horizontal_symmetry_line(pattern) do
+    transposed_pattern = pattern |> Mirrors.transpose()
+    get_vertical_symmetry_line(transposed_pattern)
+  end
+
+  def get_symmetry_score(pattern) do
+    case get_vertical_symmetry_line(pattern) do
+      nil -> get_horizontal_symmetry_line(pattern)
+      val -> 100 * val
+    end
+  end
+
+  def solve(input) do
+    input
+    |> Enum.map(&get_symmetry_score/1)
+    |> Enum.sum()
+  end
+end
+
+SmudgedMirrors.solve(test_input)
+```
+
+```elixir
+input |> SmudgedMirrors.solve()
+```
