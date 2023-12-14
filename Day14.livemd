@@ -1,0 +1,157 @@
+# Day 14
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/14.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  "O....#....",
+  "O.OO#....#",
+  ".....##...",
+  "OO.#O....O",
+  ".O.....O#.",
+  "O.#..O.#.#",
+  "..O..#O..O",
+  ".......O..",
+  "#....###..",
+  "#OO..#...."
+]
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def parse(input) do
+    input
+    |> Enum.map(&String.graphemes/1)
+  end
+
+  def transpose(platform) do
+    x_size = platform |> hd |> Enum.count()
+
+    0..(x_size - 1)
+    |> Enum.map(fn i -> Enum.map(platform, &Enum.at(&1, i)) end)
+  end
+
+  def slide_west([]), do: []
+
+  def slide_west(["#" | remaining_row]) do
+    ["#" | slide_west(remaining_row)]
+  end
+
+  def slide_west(row) do
+    {before_cube, after_cube} =
+      row
+      |> Enum.split_while(&(&1 != "#"))
+
+    (before_cube |> Enum.sort(:desc)) ++ slide_west(after_cube)
+  end
+
+  def calculate_load(platform) do
+    platform
+    |> Enum.reverse()
+    |> Enum.with_index(1)
+    |> Enum.map(fn {r, i} -> Enum.count(r, &(&1 == "O")) * i end)
+    |> Enum.sum()
+  end
+
+  def solve(input) do
+    input
+    |> parse()
+    |> transpose()
+    |> Enum.map(&slide_west/1)
+    |> transpose()
+    |> calculate_load()
+  end
+end
+
+test_input |> Part1.solve()
+```
+
+```elixir
+input |> Part1.solve()
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def mirror_y(platform) do
+    platform
+    |> Enum.map(&Enum.reverse/1)
+  end
+
+  def spin_cycle(platform) do
+    platform
+    |> Part1.transpose()
+    # N <-
+    |> slide_all_west()
+    |> Part1.transpose()
+    # W <-
+    |> slide_all_west()
+    |> Part1.transpose()
+    |> mirror_y()
+    # S <-
+    |> slide_all_west()
+    |> mirror_y()
+    |> Part1.transpose()
+    |> mirror_y()
+    # E <-
+    |> slide_all_west()
+    |> mirror_y()
+
+    # W <-
+  end
+
+  def slide_all_west(platform) do
+    platform
+    |> Enum.map(&Part1.slide_west/1)
+  end
+
+  def run_spin_cycles(previous_states, n) do
+    next_state = previous_states |> hd() |> spin_cycle()
+
+    case previous_states |> Enum.find_index(&(&1 == next_state)) do
+      nil ->
+        run_spin_cycles([next_state | previous_states], n)
+
+      found ->
+        repeat_after = Enum.count(previous_states)
+        first_occurance = repeat_after - found - 1
+        loop_length = repeat_after - first_occurance
+        index_into_loop = rem(n - first_occurance, loop_length)
+        previous_states |> Enum.at(loop_length - index_into_loop - 1)
+    end
+  end
+
+  def solve(input) do
+    input
+    |> Part1.parse()
+    |> wrap()
+    |> run_spin_cycles(1_000_000_000)
+    |> Part1.calculate_load()
+  end
+
+  def wrap(l), do: [l]
+end
+
+test_input |> Part2.solve()
+```
+
+```elixir
+input |> Part2.solve()
+```
