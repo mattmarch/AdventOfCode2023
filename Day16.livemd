@@ -1,0 +1,198 @@
+# Day 16
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/16.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  ".|...\\....",
+  "|.-.\\.....",
+  ".....|-...",
+  "........|.",
+  "..........",
+  ".........\\",
+  "..../.\\\\..",
+  ".-.-/..|..",
+  ".|....-|.\\",
+  "..//.|...."
+]
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def parse_line({line, y}) do
+    line
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {v, x} -> {{x, y}, v} end)
+  end
+
+  def parse(input) do
+    input
+    |> Enum.with_index()
+    |> Enum.flat_map(&parse_line/1)
+    |> Map.new()
+  end
+
+  def get_next_square({x, y}, direction) do
+    case direction do
+      :north -> {x, y - 1}
+      :east -> {x + 1, y}
+      :south -> {x, y + 1}
+      :west -> {x - 1, y}
+    end
+  end
+
+  def check_visited_and_update(seen_squares, current, direction) do
+    case seen_squares |> Map.get(current) do
+      nil ->
+        {false, seen_squares |> Map.put(current, [direction])}
+
+      seen_directions ->
+        if seen_directions |> Enum.member?(direction) do
+          {true, seen_squares}
+        else
+          {false, seen_squares |> Map.put(current, [direction | seen_directions])}
+        end
+    end
+  end
+
+  def get_next_directions(contraption_square, current_direction) do
+    case {current_direction, contraption_square} do
+      {d, "."} -> [d]
+      {d, "|"} when d == :north or d == :south -> [d]
+      {_d, "|"} -> [:north, :south]
+      {d, "-"} when d == :east or d == :west -> [d]
+      {_d, "-"} -> [:east, :west]
+      {:north, "/"} -> [:east]
+      {:east, "/"} -> [:north]
+      {:south, "/"} -> [:west]
+      {:west, "/"} -> [:south]
+      {:north, "\\"} -> [:west]
+      {:east, "\\"} -> [:south]
+      {:south, "\\"} -> [:east]
+      {:west, "\\"} -> [:north]
+      {_d, nil} -> []
+    end
+  end
+
+  def trace_light_beam(contraption, seen_squares, current_square, direction) do
+    next_coord = get_next_square(current_square, direction)
+
+    {visited_before, updated_seen_squares} =
+      check_visited_and_update(seen_squares, current_square, direction)
+
+    if visited_before do
+      seen_squares
+    else
+      get_next_directions(contraption |> Map.get(next_coord), direction)
+      |> Enum.reduce(updated_seen_squares, fn d, seen ->
+        trace_light_beam(contraption, seen, next_coord, d)
+      end)
+    end
+  end
+
+  def solve(input) do
+    contraption = parse(input)
+    start_pos = {-1, 0}
+    lit_squares = trace_light_beam(contraption, Map.new(), start_pos, :east)
+    lit_squares |> Map.keys() |> Enum.reject(&(&1 == start_pos)) |> Enum.count()
+  end
+end
+
+test_input |> Part1.solve()
+```
+
+```elixir
+input |> Part1.solve()
+```
+
+Little module to print the output for debugging!
+
+```elixir
+defmodule Print do
+  def format_line(seen, input_line, y) do
+    input_line
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {_, x} -> if seen |> Map.has_key?({x, y}), do: "#", else: "." end)
+    |> Enum.join()
+  end
+
+  def print(seen, input) do
+    input
+    |> Enum.with_index()
+    |> Enum.each(fn {l, y} -> format_line(seen, l, y) |> IO.puts() end)
+  end
+end
+
+contraption = Part1.parse(input)
+lit_squares = Part1.trace_light_beam(contraption, Map.new(), {-1, 0}, :east)
+Print.print(lit_squares, input)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def count_lit_from_start_position(contraption, start_position, direction) do
+    lit_squares = Part1.trace_light_beam(contraption, Map.new(), start_position, direction)
+    lit_squares |> Map.keys() |> Enum.reject(&(&1 == start_position)) |> Enum.count()
+  end
+
+  def get_start_positions(contraption) do
+    all_positions = Map.keys(contraption)
+
+    {max_x, max_y} =
+      all_positions
+      |> Enum.max_by(fn {x, y} -> x + y end)
+
+    west_side =
+      0..max_y
+      |> Enum.map(fn y -> {{-1, y}, :east} end)
+
+    east_side =
+      0..max_y
+      |> Enum.map(fn y -> {{max_x + 1, y}, :west} end)
+
+    north_side =
+      0..max_x
+      |> Enum.map(fn x -> {{x, -1}, :south} end)
+
+    south_side =
+      0..max_x
+      |> Enum.map(fn x -> {{x, max_y + 1}, :north} end)
+
+    List.flatten([west_side, east_side, north_side, south_side])
+  end
+
+  def solve(input) do
+    contraption = Part1.parse(input)
+
+    get_start_positions(contraption)
+    |> Enum.map(fn {p, dir} -> count_lit_from_start_position(contraption, p, dir) end)
+    |> Enum.max()
+  end
+end
+
+test_input |> Part2.solve()
+```
+
+```elixir
+input |> Part2.solve()
+```
