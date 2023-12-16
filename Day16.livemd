@@ -111,7 +111,11 @@ defmodule Part1 do
     contraption = parse(input)
     start_pos = {-1, 0}
     lit_squares = trace_light_beam(contraption, Map.new(), start_pos, :east)
-    lit_squares |> Map.keys() |> Enum.reject(&(&1 == start_pos)) |> Enum.count()
+
+    lit_squares
+    |> Map.keys()
+    |> Enum.reject(&(&1 == start_pos))
+    |> Enum.count()
   end
 end
 
@@ -152,7 +156,11 @@ Print.print(lit_squares, input)
 defmodule Part2 do
   def count_lit_from_start_position(contraption, start_position, direction) do
     lit_squares = Part1.trace_light_beam(contraption, Map.new(), start_position, direction)
-    lit_squares |> Map.keys() |> Enum.reject(&(&1 == start_position)) |> Enum.count()
+
+    lit_squares
+    |> Map.keys()
+    |> Enum.reject(&(&1 == start_position))
+    |> Enum.count()
   end
 
   def get_start_positions(contraption) do
