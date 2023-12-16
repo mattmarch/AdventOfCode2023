@@ -1,0 +1,115 @@
+# Day 15
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/15.txt")
+  |> String.trim_trailing()
+  |> String.split(",")
+
+input
+```
+
+```elixir
+test_input =
+  "rn=1,cm-,qp=3,cm=2,qp-,pc=4,ot=9,ab=5,pc-,pc=6,ot=7"
+  |> String.split(",")
+```
+
+## Part 1
+
+```elixir
+defmodule Hash do
+  def hash_next(val, current) do
+    rem((val + current) * 17, 256)
+  end
+
+  def hash(s) do
+    s
+    |> String.to_charlist()
+    |> Enum.reduce(0, &hash_next/2)
+  end
+
+  def solve(input) do
+    input
+    |> Enum.map(&hash/1)
+    |> Enum.sum()
+  end
+end
+
+test_input |> Hash.solve()
+```
+
+```elixir
+input |> Hash.solve()
+```
+
+## Part 2
+
+```elixir
+defmodule HashMap do
+  def parse_label(operation) do
+    [label_name] = Regex.run(~r/[a-z]+/, operation)
+
+    case operation |> String.replace_leading(label_name, "") do
+      "-" -> {label_name, :remove}
+      "=" <> n -> {label_name, :add, String.to_integer(n)}
+    end
+  end
+
+  def process_instruction({label, :remove}, state) do
+    box_id = Hash.hash(label)
+
+    case state |> Map.get(box_id) do
+      nil -> state
+      lenses -> state |> Map.put(box_id, lenses |> Enum.filter(fn {l, _fl} -> l != label end))
+    end
+  end
+
+  def process_instruction({label, :add, fl}, state) do
+    box_id = Hash.hash(label)
+    state |> Map.update(box_id, [{label, fl}], &add_to_box(&1, label, fl))
+  end
+
+  def add_to_box(box, label, focal_length) do
+    case box |> Enum.find_index(fn {l, _fl} -> l == label end) do
+      nil -> [{label, focal_length} | box]
+      i -> box |> List.replace_at(i, {label, focal_length})
+    end
+  end
+
+  def run_instructions(instructions) do
+    instructions
+    |> Enum.reduce(Map.new(), &process_instruction/2)
+  end
+
+  def get_box_power(box_id, lenses) do
+    lenses
+    |> Enum.reverse()
+    |> Enum.with_index(1)
+    |> Enum.map(fn {{_l, fl}, i} -> fl * i * (box_id + 1) end)
+    |> Enum.sum()
+  end
+
+  def solve(input) do
+    input
+    |> Enum.map(&parse_label/1)
+    |> run_instructions()
+    |> Map.to_list()
+    |> Enum.map(fn {box_id, lenses} -> get_box_power(box_id, lenses) end)
+    |> Enum.sum()
+  end
+end
+
+test_input |> HashMap.solve()
+```
+
+```elixir
+input |> HashMap.solve()
+```
