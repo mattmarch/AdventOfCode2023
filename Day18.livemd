@@ -1,0 +1,137 @@
+# Day 18
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/18.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  "R 6 (#70c710)",
+  "D 5 (#0dc571)",
+  "L 2 (#5713f0)",
+  "D 2 (#d2c081)",
+  "R 2 (#59c680)",
+  "D 2 (#411b91)",
+  "L 5 (#8ceee2)",
+  "U 2 (#caa173)",
+  "L 1 (#1b58a2)",
+  "U 2 (#caa171)",
+  "R 2 (#7807d2)",
+  "U 3 (#a77fa3)",
+  "L 2 (#015232)",
+  "U 2 (#7a21e3)"
+]
+```
+
+## Part 1
+
+```elixir
+defmodule Dig do
+  def parse_line(line) do
+    [direction, distance, colour] = String.split(line)
+
+    {
+      direction,
+      String.to_integer(distance),
+      String.replace(colour, ["(", ")"], "")
+    }
+  end
+
+  def parse(input) do
+    input
+    |> Enum.map(&parse_line/1)
+  end
+
+  def apply_instruction({_d, 0, _c}, dug_coords), do: dug_coords
+
+  def apply_instruction({dir, distance, c}, dug_coords) do
+    {x, y} = dug_coords |> hd()
+
+    next_coord =
+      case dir do
+        "U" -> {x, y - 1}
+        "R" -> {x + 1, y}
+        "D" -> {x, y + 1}
+        "L" -> {x - 1, y}
+      end
+
+    apply_instruction({dir, distance - 1, c}, [next_coord | dug_coords])
+  end
+
+  def find_contained(outside, {x, y}, found) do
+    if MapSet.member?(found, {x, y}) do
+      found
+    else
+      [
+        {x, y - 1},
+        {x + 1, y},
+        {x, y + 1},
+        {x - 1, y}
+      ]
+      |> Enum.reject(fn c -> MapSet.member?(found, c) or MapSet.member?(outside, c) end)
+      |> Enum.reduce(MapSet.put(found, {x, y}), fn next_coord, found_coords ->
+        find_contained(outside, next_coord, found_coords)
+      end)
+    end
+  end
+
+  def solve(input) do
+    trench =
+      input
+      |> parse()
+      |> Enum.reduce([{0, 0}], &apply_instruction/2)
+      |> MapSet.new()
+
+    inside_trench = find_contained(trench, {1, 1}, MapSet.new())
+    MapSet.size(trench) + MapSet.size(inside_trench)
+  end
+end
+
+test_input |> Dig.solve()
+```
+
+```elixir
+input |> Dig.solve()
+```
+
+## Part 2
+
+```elixir
+defmodule Dig2 do
+  def decode_line({_dir, _dist, "#" <> hex}) do
+    {dist_code, dir_code} = hex |> String.split_at(5)
+
+    dir =
+      case dir_code do
+        "0" -> "R"
+        "1" -> "D"
+        "2" -> "L"
+        "3" -> "U"
+      end
+
+    dist = String.to_integer(dist_code, 16)
+
+    {dir, dist}
+  end
+
+  def solve(input) do
+    input
+    |> Dig.parse()
+    |> Enum.map(&decode_line/1)
+  end
+end
+
+test_input |> Dig2.solve()
+```
