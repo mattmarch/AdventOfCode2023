@@ -1,0 +1,233 @@
+# Day 17
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/17.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input = [
+  "2413432311323",
+  "3215453535623",
+  "3255245654254",
+  "3446585845452",
+  "4546657867536",
+  "1438598798454",
+  "4457876987766",
+  "3637877979653",
+  "4654967986887",
+  "4564679986453",
+  "1224686865563",
+  "2546548887735",
+  "4322674655533"
+]
+```
+
+## Part 1
+
+```elixir
+defmodule Crucible do
+  def parse_line({line, y}) do
+    line
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {c, x} -> {{x, y}, String.to_integer(c)} end)
+  end
+
+  def parse(input) do
+    input
+    |> Enum.with_index()
+    |> Enum.flat_map(&parse_line/1)
+    |> Map.new()
+  end
+
+  def get_possible_next_steps({x, y}, direction, steps_in_direction) do
+    case direction do
+      :north ->
+        [
+          {{x, y - 1}, :north, steps_in_direction + 1},
+          {{x - 1, y}, :west, 0},
+          {{x + 1, y}, :east, 0}
+        ]
+
+      :east ->
+        [
+          {{x + 1, y}, :east, steps_in_direction + 1},
+          {{x, y - 1}, :north, 0},
+          {{x, y + 1}, :south, 0}
+        ]
+
+      :south ->
+        [
+          {{x, y + 1}, :south, steps_in_direction + 1},
+          {{x - 1, y}, :west, 0},
+          {{x + 1, y}, :east, 0}
+        ]
+
+      :west ->
+        [
+          {{x - 1, y}, :west, steps_in_direction + 1},
+          {{x, y - 1}, :north, 0},
+          {{x, y + 1}, :south, 0}
+        ]
+    end
+    |> Enum.filter(fn {_p, _d, steps} -> steps < 3 end)
+  end
+
+  def traverse(map, visited_tiles, next_queue, target) do
+    [{{pos, dir, steps}, heat_loss} | queue_tail] = next_queue
+
+    next_tiles =
+      get_possible_next_steps(pos, dir, steps)
+      |> Enum.filter(fn {p, _d, _s} -> Map.has_key?(map, p) end)
+      |> Enum.reject(fn k -> Map.has_key?(visited_tiles, k) end)
+      |> Enum.map(fn {p, d, s} -> {{p, d, s}, Map.get(map, p) + heat_loss} end)
+
+    case next_tiles |> Enum.find(fn {{p, _d, _s}, _v} -> p == target end) do
+      {_k, heat} ->
+        heat
+
+      nil ->
+        updated_visited =
+          visited_tiles
+          |> Map.put({pos, dir, steps}, heat_loss)
+
+        updated_queue =
+          (next_tiles ++ queue_tail)
+          |> Enum.sort_by(&elem(&1, 1))
+          |> Enum.uniq_by(&elem(&1, 0))
+
+        traverse(map, updated_visited, updated_queue, target)
+    end
+  end
+
+  def solve(input) do
+    map =
+      input
+      |> parse()
+
+    target =
+      map
+      |> Map.keys()
+      |> Enum.max_by(fn {x, y} -> x + y end)
+
+    map
+    |> traverse(Map.new(), [{{{0, 0}, :east, 0}, 0}], target)
+  end
+end
+
+test_input |> Crucible.solve()
+```
+
+```elixir
+input |> Crucible.solve()
+```
+
+## Part 2
+
+```elixir
+defmodule UltraCrucible do
+  def get_possible_next_steps({x, y}, direction, steps) when steps < 3 do
+    next_coord =
+      case direction do
+        :north -> {x, y - 1}
+        :east -> {x + 1, y}
+        :south -> {x, y + 1}
+        :west -> {x - 1, y}
+      end
+
+    [{next_coord, direction, steps + 1}]
+  end
+
+  def get_possible_next_steps({x, y}, direction, steps_in_direction) do
+    case direction do
+      :north ->
+        [
+          {{x, y - 1}, :north, steps_in_direction + 1},
+          {{x - 1, y}, :west, 0},
+          {{x + 1, y}, :east, 0}
+        ]
+
+      :east ->
+        [
+          {{x + 1, y}, :east, steps_in_direction + 1},
+          {{x, y - 1}, :north, 0},
+          {{x, y + 1}, :south, 0}
+        ]
+
+      :south ->
+        [
+          {{x, y + 1}, :south, steps_in_direction + 1},
+          {{x - 1, y}, :west, 0},
+          {{x + 1, y}, :east, 0}
+        ]
+
+      :west ->
+        [
+          {{x - 1, y}, :west, steps_in_direction + 1},
+          {{x, y - 1}, :north, 0},
+          {{x, y + 1}, :south, 0}
+        ]
+    end
+    |> Enum.filter(fn {_p, _d, steps} -> steps < 10 end)
+  end
+
+  def traverse(map, visited_tiles, next_queue, target) do
+    [{{pos, dir, steps}, heat_loss} | queue_tail] = next_queue
+
+    next_tiles =
+      get_possible_next_steps(pos, dir, steps)
+      |> Enum.filter(fn {p, _d, _s} -> Map.has_key?(map, p) end)
+      |> Enum.reject(fn k -> Map.has_key?(visited_tiles, k) end)
+      |> Enum.map(fn {p, d, s} -> {{p, d, s}, Map.get(map, p) + heat_loss} end)
+
+    case next_tiles |> Enum.find(fn {{p, _d, _s}, _v} -> p == target end) do
+      {_k, heat} ->
+        heat
+
+      nil ->
+        updated_visited =
+          visited_tiles
+          |> Map.put({pos, dir, steps}, heat_loss)
+
+        updated_queue =
+          (next_tiles ++ queue_tail)
+          |> Enum.sort_by(&elem(&1, 1))
+          |> Enum.uniq_by(&elem(&1, 0))
+
+        traverse(map, updated_visited, updated_queue, target)
+    end
+  end
+
+  def solve(input) do
+    map =
+      input
+      |> Crucible.parse()
+
+    target =
+      map
+      |> Map.keys()
+      |> Enum.max_by(fn {x, y} -> x + y end)
+
+    map
+    |> traverse(Map.new(), [{{{0, 0}, :east, 0}, 0}], target)
+  end
+end
+
+test_input |> UltraCrucible.solve()
+```
+
+```elixir
+input |> UltraCrucible.solve()
+```
