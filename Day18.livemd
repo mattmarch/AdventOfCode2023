@@ -126,12 +126,56 @@ defmodule Dig2 do
     {dir, dist}
   end
 
+  def get_corners([], c), do: [c]
+
+  def get_corners([{dir, dist} | other_instructions], {x, y}) do
+    next_coord =
+      case dir do
+        "U" -> {x, y - dist}
+        "R" -> {x + dist, y}
+        "D" -> {x, y + dist}
+        "L" -> {x - dist, y}
+      end
+
+    [{x, y} | get_corners(other_instructions, next_coord)]
+  end
+
+  def area_of_polygon(corners) do
+    {total1, total2} =
+      corners
+      |> tl()
+      |> Enum.zip_reduce(corners, {0, 0}, fn {x1, y1}, {x2, y2}, {total1, total2} ->
+        {total1 + x1 * y2, total2 + x2 * y1}
+      end)
+
+    abs(total1 - total2) |> div(2)
+  end
+
+  def perimeter(corners) do
+    corners
+    |> tl()
+    |> Enum.zip_reduce(corners, 0, fn {x1, y1}, {x2, y2}, total ->
+      total + abs(x1 - x2) + abs(y1 - y2)
+    end)
+  end
+
   def solve(input) do
-    input
-    |> Dig.parse()
-    |> Enum.map(&decode_line/1)
+    corners =
+      input
+      |> Dig.parse()
+      |> Enum.map(&decode_line/1)
+      |> get_corners({0, 0})
+
+    # Area enclosed within centre line going through points
+    # add half width of outline
+    # Add one to account for the 4 more internal corners than external
+    area_of_polygon(corners) + div(perimeter(corners), 2) + 1
   end
 end
 
 test_input |> Dig2.solve()
+```
+
+```elixir
+input |> Dig2.solve()
 ```
