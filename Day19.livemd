@@ -1,0 +1,285 @@
+# Day 19
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/19.txt")
+  |> String.trim_trailing()
+  |> String.split("\n\n")
+  |> Enum.map(&String.split(&1, "\n"))
+  |> List.to_tuple()
+
+input
+```
+
+```elixir
+test_input =
+  {[
+     "px{a<2006:qkq,m>2090:A,rfg}",
+     "pv{a>1716:R,A}",
+     "lnx{m>1548:A,A}",
+     "rfg{s<537:gd,x>2440:R,A}",
+     "qs{s>3448:A,lnx}",
+     "qkq{x<1416:A,crn}",
+     "crn{x>2662:A,R}",
+     "in{s<1351:px,qqz}",
+     "qqz{s>2770:qs,m<1801:hdj,R}",
+     "gd{a>3333:R,R}",
+     "hdj{m>838:A,pv}"
+   ],
+   [
+     "{x=787,m=2655,a=1222,s=2876}",
+     "{x=1679,m=44,a=2067,s=496}",
+     "{x=2036,m=264,a=79,s=2244}",
+     "{x=2461,m=1339,a=466,s=291}",
+     "{x=2127,m=1623,a=2188,s=1013}"
+   ]}
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  defmodule Part do
+    defstruct [:x, :m, :a, :s]
+  end
+
+  def parse_part(part_line) do
+    ["x=" <> x, "m=" <> m, "a=" <> a, "s=" <> s] =
+      part_line
+      |> String.replace(["{", "}"], "")
+      |> String.split(",")
+
+    %Part{
+      x: String.to_integer(x),
+      m: String.to_integer(m),
+      a: String.to_integer(a),
+      s: String.to_integer(s)
+    }
+  end
+
+  defmodule WorkflowStep do
+    defstruct [:variable, :operator, :value, :goto]
+  end
+
+  def parse_workflow(workflow_line) do
+    [name, steps] =
+      workflow_line
+      |> String.replace("}", "")
+      |> String.split("{")
+
+    {name, steps |> String.split(",") |> Enum.map(&parse_step/1)}
+  end
+
+  def parse_condition("A"), do: :accepted
+  def parse_condition("R"), do: :rejected
+
+  def parse_step(condition) do
+    case condition |> String.split(":") do
+      ["A"] -> :accepted
+      ["R"] -> :rejected
+      [next_step] -> next_step
+      [condition, next_step] -> parse_condition(condition, next_step)
+    end
+  end
+
+  def parse_condition(condition, next_step) do
+    {variable_name, after_variable} = condition |> String.split_at(1)
+
+    variable =
+      case variable_name do
+        "x" -> :x
+        "m" -> :m
+        "a" -> :a
+        "s" -> :s
+      end
+
+    {operator_string, value} = after_variable |> String.split_at(1)
+
+    operator =
+      case operator_string do
+        "<" -> :lt
+        ">" -> :gt
+      end
+
+    goto =
+      case next_step do
+        "A" -> :accepted
+        "R" -> :rejected
+        otherwise -> otherwise
+      end
+
+    %WorkflowStep{
+      variable: variable,
+      operator: operator,
+      value: String.to_integer(value),
+      goto: goto
+    }
+  end
+
+  def run_workflows(part, workflows, workflow_name) do
+    result =
+      workflows
+      |> Map.get(workflow_name)
+      |> run_workflow(part)
+
+    case result do
+      :accepted -> part.x + part.m + part.a + part.s
+      :rejected -> 0
+      next_workflow -> run_workflows(part, workflows, next_workflow)
+    end
+  end
+
+  def run_workflow([next_step], _part), do: next_step
+
+  def run_workflow([next_step | other_steps], part) do
+    var =
+      case next_step.variable do
+        :x -> part.x
+        :m -> part.m
+        :a -> part.a
+        :s -> part.s
+      end
+
+    condition_result =
+      case next_step.operator do
+        :lt -> var < next_step.value
+        :gt -> var > next_step.value
+      end
+
+    if condition_result do
+      next_step.goto
+    else
+      run_workflow(other_steps, part)
+    end
+  end
+
+  def solve({input_workflows, input_parts}) do
+    workflows = input_workflows |> Enum.map(&parse_workflow/1) |> Map.new()
+    parts = input_parts |> Enum.map(&parse_part/1)
+
+    parts
+    |> Enum.map(&run_workflows(&1, workflows, "in"))
+    |> Enum.sum()
+  end
+end
+
+test_input |> Part1.solve()
+```
+
+```elixir
+input |> Part1.solve()
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  defmodule Condition do
+    defstruct [:var, :operator, :value]
+  end
+
+  def build_tree_from_workflow_name(workflows, node) do
+    workflow = workflows |> Map.get(node)
+    build_tree_from_workflow(workflows, workflow)
+  end
+
+  def build_tree_from_workflow(_, [:accepted]), do: :accepted
+  def build_tree_from_workflow(_, [:rejected]), do: :rejected
+
+  def build_tree_from_workflow(workflows, [next_workflow]),
+    do: build_tree_from_workflow_name(workflows, next_workflow)
+
+  def build_tree_from_workflow(workflows, [step | other_steps]) do
+    {
+      %Condition{var: step.variable, operator: step.operator, value: step.value},
+      case step.goto do
+        :accepted -> :accepted
+        :rejected -> :rejected
+        name -> build_tree_from_workflow_name(workflows, name)
+      end,
+      build_tree_from_workflow(workflows, other_steps)
+    }
+  end
+
+  def invert_condition(condition) do
+    case condition.operator do
+      :lt -> %Condition{condition | operator: :gt, value: condition.value - 1}
+      :gt -> %Condition{condition | operator: :lt, value: condition.value + 1}
+    end
+  end
+
+  def get_accepted_conditions({_, :accepted, :accepted}, previous), do: [previous]
+  def get_accepted_conditions(:accepted, previous), do: [previous]
+  def get_accepted_conditions(:rejected, _previous), do: []
+
+  def get_accepted_conditions({condition, if_true, if_false}, previous) do
+    get_accepted_conditions(if_true, [condition | previous]) ++
+      get_accepted_conditions(if_false, [invert_condition(condition) | previous])
+  end
+
+  defmodule ConditionSet do
+    defstruct [:x, :m, :a, :s]
+  end
+
+  def simplify_condition_group(group) do
+    %ConditionSet{
+      x: get_range_in_axis(group, :x),
+      m: get_range_in_axis(group, :m),
+      a: get_range_in_axis(group, :a),
+      s: get_range_in_axis(group, :s)
+    }
+  end
+
+  def get_range_in_axis(conditions, axis) do
+    relevant_conditions =
+      conditions
+      |> Enum.filter(fn c -> c.var == axis end)
+
+    min_value =
+      relevant_conditions
+      |> Enum.filter(fn c -> c.operator == :gt end)
+      |> Enum.map(fn c -> c.value end)
+      |> Enum.concat([0])
+      |> Enum.max()
+
+    max_value =
+      relevant_conditions
+      |> Enum.filter(fn c -> c.operator == :lt end)
+      |> Enum.map(fn c -> c.value end)
+      |> Enum.concat([4001])
+      |> Enum.min()
+
+    {min_value, max_value}
+  end
+
+  def range({r_start, r_end}), do: r_end - r_start - 1
+
+  def count_possible_values(c) do
+    range(c.x) * range(c.m) * range(c.a) * range(c.s)
+  end
+
+  def solve({input_workflows, _input_parts}) do
+    input_workflows
+    |> Enum.map(&Part1.parse_workflow/1)
+    |> Map.new()
+    |> build_tree_from_workflow_name("in")
+    |> get_accepted_conditions([])
+    |> Enum.map(&simplify_condition_group/1)
+    |> Enum.map(&count_possible_values/1)
+    |> Enum.sum()
+  end
+end
+
+test_input |> Part2.solve()
+```
+
+```elixir
+input |> Part2.solve()
+```
