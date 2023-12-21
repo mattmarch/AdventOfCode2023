@@ -1,0 +1,221 @@
+# Day 20
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/20.txt")
+  |> String.trim_trailing()
+  |> String.split("\n")
+
+input
+```
+
+```elixir
+test_input1 = [
+  "broadcaster -> a, b, c",
+  "%a -> b",
+  "%b -> c",
+  "%c -> inv",
+  "&inv -> a"
+]
+
+test_input2 = [
+  "broadcaster -> a",
+  "%a -> inv, con",
+  "&inv -> b",
+  "%b -> con",
+  "&con -> output"
+]
+```
+
+## Part 1
+
+```elixir
+defmodule PulseModule do
+  defstruct [:type, :destinations, :state]
+
+  def parse_line(line) do
+    [prefixed_name, destination_string] = line |> String.split(" -> ")
+
+    destinations = destination_string |> String.split(", ")
+
+    case prefixed_name do
+      "broadcaster" ->
+        {"broadcaster", %PulseModule{type: :broadcaster, destinations: destinations}}
+
+      "%" <> n ->
+        {n, %PulseModule{type: :flipflop, destinations: destinations, state: false}}
+
+      "&" <> n ->
+        {n, %PulseModule{type: :conjunction, destinations: destinations, state: Map.new()}}
+    end
+  end
+
+  def set_inputs({name, m}, _all_modules) when m.type != :conjunction, do: {name, m}
+
+  def set_inputs({name, m}, all_modules) do
+    inputs =
+      all_modules
+      |> Enum.filter(fn {_n, %PulseModule{destinations: d}} -> Enum.member?(d, name) end)
+      |> Enum.map(fn {name, _m} -> {name, :low} end)
+      |> Map.new()
+
+    {name, %PulseModule{m | state: inputs}}
+  end
+
+  def update_conjunction_inputs(modules) do
+    modules
+    |> Enum.map(&set_inputs(&1, modules))
+  end
+
+  def run_n_button_presses(system, n), do: run_n_button_presses(system, {0, 0}, n)
+
+  def run_n_button_presses(_system, counts, 0), do: counts
+
+  def run_n_button_presses(system, {high_total, low_total}, n) do
+    cycle_states = run_button_press(system) |> Enum.to_list()
+    {high_count, low_count} = count_pulses(cycle_states)
+
+    run_n_button_presses(
+      cycle_states |> List.last() |> elem(0),
+      {high_total + high_count, low_total + low_count},
+      n - 1
+    )
+  end
+
+  def count_pulses(cycle_states) do
+    all_messages =
+      cycle_states
+      |> Enum.map(&elem(&1, 1))
+      |> Enum.concat()
+
+    high_pulses =
+      all_messages
+      |> Enum.count(fn {_, _, v} -> v == :high end)
+
+    # include 1 from button to broadcaster
+    low_pulses =
+      1 +
+        (all_messages
+         |> Enum.count(fn {_, _, v} -> v == :low end))
+
+    {high_pulses, low_pulses}
+  end
+
+  def run_button_press(system) do
+    broadcaster = system |> Map.get("broadcaster")
+
+    start_messages =
+      broadcaster.destinations
+      |> Enum.map(fn d -> {d, "broadcaster", :low} end)
+
+    Stream.iterate({system, start_messages}, fn {system, inputs} ->
+      run_clock_cycle(system, inputs)
+    end)
+    |> Stream.take_while(fn {_s, messages} -> not Enum.empty?(messages) end)
+  end
+
+  def run_clock_cycle(system, inputs) do
+    inputs_per_component =
+      inputs
+      |> Enum.group_by(fn {to, _f, _v} -> to end, fn {_t, from, value} -> {from, value} end)
+
+    inputs_per_component
+    |> Map.to_list()
+    |> Enum.reduce({system, []}, fn {module_name, inputs}, {system, messages} ->
+      {updated_system, new_messages} = apply_inputs_to_component(module_name, inputs, system)
+      {updated_system, messages ++ new_messages}
+    end)
+  end
+
+  def apply_inputs_to_component(module_name, inputs, system) do
+    module = system |> Map.get(module_name)
+
+    if is_nil(module) do
+      {system, []}
+    else
+      {updated_state, output} = sim_gate(module.type, module.state, inputs)
+      updated_module = %PulseModule{module | state: updated_state}
+
+      labelled_outputs =
+        if is_nil(output) do
+          []
+        else
+          module.destinations |> Enum.map(fn d -> {d, module_name, output} end)
+        end
+
+      {
+        system |> Map.put(module_name, updated_module),
+        labelled_outputs
+      }
+    end
+  end
+
+  def sim_gate(:conjunction, state, inputs) do
+    updated_state =
+      inputs
+      |> Enum.reduce(state, fn {name, value}, s -> Map.put(s, name, value) end)
+
+    if updated_state |> Map.values() |> Enum.all?(&(&1 == :high)) do
+      {updated_state, :low}
+    else
+      {updated_state, :high}
+    end
+  end
+
+  def sim_gate(:flipflop, state, [{_from, :high}]), do: {state, nil}
+
+  def sim_gate(:flipflop, state, [{_from, :low}]) do
+    {not state, if(state, do: :low, else: :high)}
+  end
+
+  def sim_gate(:flipflop, state, inputs), do: sim_gate(:flipflop, state, List.last(inputs))
+
+  # # Hopefully we don't need this?
+  # def sim_gate(:flipflop, state, inputs) do
+  #   states =
+  #   inputs
+  #   |> Enum.map(fn {_from, value} -> value end)
+  #   |> Enum.filter(&(&1 == :low))
+  #   |> Enum.scan(state, fn :low, s -> not(s) end)
+
+  #   outputs =
+  #     states
+  #     |> Enum.map(fn s -> if s, do: :high, else: :low end)
+
+  #   {List.last(states), List.last(outputs)}
+  # end
+
+  def parse(input) do
+    input
+    |> Enum.map(&parse_line/1)
+    |> update_conjunction_inputs()
+    |> Map.new()
+  end
+
+  def solve(input) do
+    {high_counts, low_counts} =
+      input
+      |> parse()
+      |> run_n_button_presses(1000)
+
+    high_counts * low_counts
+  end
+end
+
+test_input1 |> PulseModule.solve()
+```
+
+```elixir
+test_input2 |> PulseModule.solve()
+```
+
+```elixir
+input |> PulseModule.solve()
+```

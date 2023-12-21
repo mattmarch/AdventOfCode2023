@@ -1,0 +1,226 @@
+# Day 21
+
+```elixir
+# Change working directory to this file's directory.
+File.cd(Path.dirname(__ENV__.file))
+
+Mix.install([
+  {:vega_lite, "~> 0.1.6"},
+  {:kino_vega_lite, "~> 0.1.10"}
+])
+```
+
+## Parse input
+
+```elixir
+input =
+  File.read!("inputs/21.txt")
+  |> String.trim_trailing()
+  |> String.split()
+
+input
+```
+
+```elixir
+test_input = [
+  "...........",
+  ".....###.#.",
+  ".###.##..#.",
+  "..#.#...#..",
+  "....#.#....",
+  ".##..S####.",
+  ".##..#...#.",
+  ".......##..",
+  ".##.#.####.",
+  ".##..##.##.",
+  "..........."
+]
+```
+
+## Part 1
+
+```elixir
+defmodule Part1 do
+  def parse_line({l, y}) do
+    l
+    |> String.graphemes()
+    |> Enum.with_index()
+    |> Enum.map(fn {c, x} -> {{x, y}, c} end)
+  end
+
+  def parse(input) do
+    grid =
+      input
+      |> Enum.with_index()
+      |> Enum.flat_map(&parse_line/1)
+
+    start =
+      grid
+      |> Enum.find(fn {_p, c} -> c == "S" end)
+      |> elem(0)
+
+    {
+      Map.new(grid),
+      start
+    }
+  end
+
+  def take_steps(_grid, positions, 0), do: positions
+
+  def take_steps(grid, positions, n) do
+    next_positions =
+      positions
+      |> Enum.flat_map(&get_steps_from_position(grid, &1))
+      |> Enum.uniq()
+
+    take_steps(grid, next_positions, n - 1)
+  end
+
+  def valid_space?(grid, p) do
+    case grid |> Map.get(p) do
+      "#" -> false
+      nil -> false
+      "." -> true
+      "S" -> true
+    end
+  end
+
+  def get_steps_from_position(grid, {x, y}) do
+    [{x, y - 1}, {x + 1, y}, {x, y + 1}, {x - 1, y}]
+    |> Enum.filter(fn p -> valid_space?(grid, p) end)
+  end
+
+  def solve(input, steps) do
+    {grid, start} =
+      input
+      |> parse()
+
+    take_steps(grid, [start], steps)
+    |> Enum.count()
+  end
+end
+
+test_input |> Part1.solve(6)
+```
+
+```elixir
+input |> Part1.solve(64)
+```
+
+## Part 2
+
+```elixir
+defmodule Part2 do
+  def take_steps(_grid, _limits, seen, _positions, 0), do: seen
+
+  def take_steps(grid, limits, seen, positions, n) do
+    next_positions =
+      positions
+      |> Enum.flat_map(&get_steps_from_position(grid, limits, &1))
+      |> Enum.reject(&Map.has_key?(seen, &1))
+      |> Enum.uniq()
+
+    updated_seen =
+      next_positions
+      |> Enum.reduce(seen, fn p, s -> Map.put_new(s, p, n - 1) end)
+
+    take_steps(grid, limits, updated_seen, next_positions, n - 1)
+  end
+
+  def valid_space?(grid, limits, p) do
+    case grid |> Map.get(wrap_position(limits, p)) do
+      "#" -> false
+      "." -> true
+      "S" -> true
+    end
+  end
+
+  def wrap_position({limit_x, limit_y}, {x, y}) do
+    {wrap(x, limit_x), wrap(y, limit_y)}
+  end
+
+  def wrap(value, limit) do
+    case rem(value, limit + 1) do
+      v when v >= 0 -> v
+      v when v < 0 -> limit + 1 + v
+    end
+  end
+
+  def get_steps_from_position(grid, limits, {x, y}) do
+    [{x, y - 1}, {x + 1, y}, {x, y + 1}, {x - 1, y}]
+    |> Enum.filter(fn p -> valid_space?(grid, limits, p) end)
+  end
+
+  def solve(input, steps) do
+    {grid, start} =
+      input
+      |> Part1.parse()
+
+    limits =
+      grid
+      |> Map.keys()
+      |> Enum.max_by(fn {x, y} -> x + y end)
+
+    take_steps(grid, limits, Map.new([{start, steps}]), [start], steps)
+    |> Map.values()
+    |> Enum.filter(fn steps_remaining -> rem(steps_remaining, 2) == 0 end)
+    |> Enum.count()
+  end
+end
+
+test_input |> Part2.solve(100)
+```
+
+```elixir
+alias VegaLite, as: Vl
+
+{grid, start} =
+  input
+  |> Part1.parse()
+
+limits =
+  grid
+  |> Map.keys()
+  |> Enum.max_by(fn {x, y} -> x + y end)
+
+steps = 1000
+
+squares_found_on_step_remaining =
+  Part2.take_steps(grid, limits, Map.new([{start, steps}]), [start], steps)
+  |> Map.values()
+  |> Enum.frequencies()
+  |> Map.to_list()
+  |> Enum.sort_by(&elem(&1, 0), :desc)
+
+x_step =
+  squares_found_on_step_remaining
+  |> Enum.map(&(steps - elem(&1, 0)))
+
+y_squares_found =
+  squares_found_on_step_remaining
+  |> Enum.map(&elem(&1, 1))
+
+Vl.new(width: 800, height: 500)
+|> Vl.data_from_values(step: x_step, squares_found: y_squares_found)
+|> Vl.mark(:line)
+|> Vl.encode_field(:x, "step", type: :quantitative)
+|> Vl.encode_field(:y, "squares_found", type: :quantitative)
+```
+
+```elixir
+differences =
+  y_squares_found
+  |> Enum.drop(1)
+  |> Enum.zip(y_squares_found)
+  |> Enum.map(fn {a, b} -> a - b end)
+
+Vl.new(width: 800, height: 500)
+|> Vl.data_from_values(difference: differences, step: 1..Enum.count(differences))
+|> Vl.mark(:line)
+|> Vl.encode_field(:x, "step", type: :quantitative)
+|> Vl.encode_field(:y, "difference", type: :quantitative)
+```
+
+```elixir
+input |> Part2.solve(64)
+```
